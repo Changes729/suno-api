@@ -65,7 +65,7 @@ class SunoApi {
    */
   private async getAuthToken() {
     // URL to get session ID
-    const getSessionUrl = `${SunoApi.CLERK_BASE_URL}/v1/client?_clerk_js_version=4.73.2`;
+    const getSessionUrl = `${SunoApi.CLERK_BASE_URL}/v1/client?_clerk_js_version=4.73.3`;
     // Get session ID
     const sessionResponse = await this.client.get(getSessionUrl);
     if (!sessionResponse?.data?.response?.['last_active_session_id']) {
@@ -80,11 +80,9 @@ class SunoApi {
    * @param isWait Indicates if the method should wait for the session to be fully renewed before returning.
    */
   public async keepAlive(isWait?: boolean): Promise<void> {
-    if (!this.sid) {
-      throw new Error("Session ID is not set. Cannot renew token.");
-    }
+    this.getAuthToken()
     // URL to renew session token
-    const renewUrl = `${SunoApi.CLERK_BASE_URL}/v1/client/sessions/${this.sid}/tokens?_clerk_js_version==4.73.2`;
+    const renewUrl = `${SunoApi.CLERK_BASE_URL}/v1/client/sessions/${this.sid}/tokens?_clerk_js_version==4.73.3`;
     // Renew session token
     const renewResponse = await this.client.post(renewUrl);
     logger.info("KeepAlive...\n");
@@ -101,7 +99,7 @@ class SunoApi {
    * @param prompt The text prompt to generate audio from.
    * @param make_instrumental Indicates if the generated audio should be instrumental.
    * @param wait_audio Indicates if the method should wait for the audio file to be fully generated before returning.
-   * @returns 
+   * @returns
    */
   public async generate(
     prompt: string,
@@ -259,7 +257,7 @@ class SunoApi {
         prompt: audio.metadata.prompt,
         type: audio.metadata.type,
         tags: audio.metadata.tags,
-        duration: audio.metadata.duration_formatted,
+        duration: audio.metadata.duration,
       }));
     }
   }
@@ -288,7 +286,7 @@ class SunoApi {
 
   /**
    * Extends an existing audio clip by generating additional content based on the provided prompt.
-   * 
+   *
    * @param audioId The ID of the audio clip to extend.
    * @param prompt The prompt for generating additional content.
    * @param continueAt Extend a new clip from a song at mm:ss(e.g. 00:30). Default extends from the end of the song.
@@ -367,7 +365,7 @@ class SunoApi {
       prompt: audio.metadata.prompt,
       type: audio.metadata.type,
       tags: audio.metadata.tags,
-      duration: audio.metadata.duration_formatted,
+      duration: audio.metadata.duration,  
       error_message: audio.metadata.error_message,
     }));
   }
