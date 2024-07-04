@@ -4,6 +4,7 @@ import pino from 'pino';
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
 import { sleep } from "@/lib/utils";
+import { httpsOverHttp } from 'tunnel';
 
 const logger = pino();
 export const DEFAULT_MODEL = "chirp-v3-5";
@@ -39,12 +40,17 @@ class SunoApi {
     const cookieJar = new CookieJar();
     const randomUserAgent = new UserAgent(/Chrome/).random().toString();
     this.client = wrapper(axios.create({
-      jar: cookieJar,
       withCredentials: true,
       headers: {
-        'User-Agent': randomUserAgent,
         'Cookie': cookie
-      }
+      },
+      httpsAgent: httpsOverHttp({
+          proxy: {
+              host: "127.0.0.1",
+              port: 20171,
+          },
+      }),
+      proxy: false
     }))
     this.client.interceptors.request.use((config) => {
       if (this.currentToken) { // Use the current token status
