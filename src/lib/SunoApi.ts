@@ -47,7 +47,7 @@ class SunoApi {
       httpsAgent: httpsOverHttp({
           proxy: {
               host: "127.0.0.1",
-              port: 20171,
+              port: 1087,
           },
       }),
       proxy: false
@@ -64,6 +64,42 @@ class SunoApi {
     await this.getAuthToken();
     await this.keepAlive();
     return this;
+  }
+
+  private waiting_for_complete(audios: string[]) {
+    logger.info(`waiting for complete: ${audios}`)
+    audios.map((audio: any) => {
+      this.on_complete(audio);
+    })
+  }
+
+  private isNonEmptyString(str: string){
+      return str && str.length > 0; // Or any other logic, removing whitespace, etc.
+  }
+
+  private async on_complete(str: string){
+    logger.info(`on complete: ${str}`)
+    var local_audio = str
+    if(this.isNonEmptyString(local_audio)){
+      const startTime = Date.now();
+      while (Date.now() - startTime < 100000) {
+        var list = [local_audio]
+        const response = await this.get(list);
+        const allCompleted = response.every(
+          audio => audio.status === 'streaming' || audio.status === 'complete'
+        );
+        const allError = response.every(
+          audio => audio.status === 'error'
+        );
+        if (allCompleted || allError) {
+          if(allCompleted) {
+            this.update_reaction_type(local_audio, true)
+          }
+          return;
+        }
+        await sleep(1, 2);
+      }
+    }
   }
 
   /**
@@ -86,7 +122,7 @@ class SunoApi {
    * @param isWait Indicates if the method should wait for the session to be fully renewed before returning.
    */
   public async keepAlive(isWait?: boolean): Promise<void> {
-    this.getAuthToken()
+    this.getAuthToken();
     // URL to renew session token
     const renewUrl = `${SunoApi.CLERK_BASE_URL}/v1/client/sessions/${this.sid}/tokens?_clerk_js_version==4.73.3`;
     // Renew session token
@@ -246,9 +282,11 @@ class SunoApi {
         await sleep(3, 6);
         await this.keepAlive(true);
       }
+      this.waiting_for_complete(songIds);
       return lastResponse;
     } else {
       await this.keepAlive(true);
+      this.waiting_for_complete(songIds);
       return response.data['clips'].map((audio: any) => ({
         id: audio.id,
         title: audio.title,
@@ -371,7 +409,7 @@ class SunoApi {
       prompt: audio.metadata.prompt,
       type: audio.metadata.type,
       tags: audio.metadata.tags,
-      duration: audio.metadata.duration,  
+      duration: audio.metadata.duration,
       error_message: audio.metadata.error_message,
     }));
   }
@@ -396,6 +434,24 @@ class SunoApi {
       monthly_limit: response.data.monthly_limit,
       monthly_usage: response.data.monthly_usage,
     };
+  }
+
+  public async update_reaction_type(clipId: string, like: boolean): Promise<object> {
+    const response = await this.client.post(`${SunoApi.BASE_URL}/api/gen/${clipId}/update_reaction_type/`, {
+      captcha_token: "",
+      reaction: like ? "LIKE" : "DISLIKE",
+    });
+    console.log("response: \n", response);
+    return response.data;
+  }
+
+  public async set_visibility(clipId: string, is_public: boolean):  Promise<object> {
+    await this.keepAlive(false);
+    const response = await this.client.post(`${SunoApi.BASE_URL}/api/gen/${clipId}/set_visibility/`, {
+      is_public: is_public
+    });
+    console.log("response: \n", response);
+    return response.data;
   }
 }
 
